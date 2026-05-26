@@ -2,6 +2,15 @@
 
 <img width="885" height="963" alt="image" src="https://github.com/user-attachments/assets/fb3a55b1-866b-4ffc-aa96-4292b3c66bbc" />
 
+Top:    User question → Supervisor (plans once)
+Middle: Executor routes to 4 paths based on query type
+Paths:
+  SCHEMA_QUERY → rag → rag_answer → answer_synth
+  RAG_THEN_SQL → rag → state_update → sql → answer_synth  
+  DATA_QUERY   → state_update → sql → answer_synth
+  CLARIFY      → clarify → answer_synth
+Retry loop:    sql failure → retry_node → sql (max 3×)
+Bottom: All paths converge to final answer
 
 ## What it does
 Converts natural language to validated SQL using a 
