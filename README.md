@@ -1,12 +1,11 @@
 # AI SQL Agent — Supervised Multi-Agent NL-to-SQL
 
-## Live Demo
-(http://localhost:8501/)
+
 
 ## What it does
 Converts natural language to validated SQL using a 
 supervised multi-agent architecture. Serves non-technical 
-teams on a 50GB enterprise database without SQL knowledge.
+teams on enterprise database without SQL knowledge.
 
 ## Architecture
 
@@ -74,4 +73,4 @@ streamlit run frontend/app.py
 
 ## Author
 Pasham Thirumal Reddy | Hyderabad, India
-[LinkedIn] | [Email]
+[https://www.linkedin.com/in/p-thirumal-reddy-9431b6182/] | [thirumalreddy0172@gmail.com]
