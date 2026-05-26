@@ -1,0 +1,47 @@
+# Virtual environment
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Environment variables
+backend/app/.env     
+
+# Logs
+logs/
+backend/logs/
+
+# Streamlit
+.streamlit/
+
+# config 
+backend/app/config.py
+
+# Vector DB
+backend/app/vector_db/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vector databases
+backend/app/rag/vector_db/
+backend/rag/vector_db/
+
+# SQLite database
+backend/data/*.db
+
+# Test artifacts
+
+tests/*.pdf
+
+# Ignore all tests
+tests/*
+
+# But keep test_runner.py
+!tests/test_runner.py

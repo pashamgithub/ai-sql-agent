@@ -1,0 +1,710 @@
+# ============================================================
+# DOCUMENT 1 — TABLE DEFINITIONS (11 tables)
+# ============================================================
+
+Table: Customer
+
+Purpose:
+Stores customer profile and contact information.
+
+Primary Key:
+CustomerId
+
+Important Columns:
+CustomerId   → unique customer identifier
+FirstName    → customer first name
+LastName     → customer last name
+Company      → organization name (nullable)
+Address      → street address
+City         → city
+State        → state or region (nullable)
+Country      → country — use for geographic filters (:country)
+PostalCode   → postal code (nullable)
+Phone        → phone number (nullable)
+Email        → email address
+SupportRepId → assigned employee support representative
+
+Relationships:
+Customer.CustomerId  → Invoice.CustomerId
+Customer.SupportRepId → Employee.EmployeeId
+
+Business Notes:
+Use for customer demographics, top customers by spending,
+country-wise distribution, and customer support analysis.
+
+---
+
+Table: Employee
+
+Purpose:
+Stores employee information and reporting hierarchy.
+
+Primary Key:
+EmployeeId
+
+Important Columns:
+EmployeeId → unique employee identifier
+FirstName  → employee first name
+LastName   → employee last name
+Title      → job role
+ReportsTo  → manager EmployeeId (self-referencing FK)
+BirthDate  → date of birth
+HireDate   → joining date
+Country    → employee country
+Email      → employee email
+
+Relationships:
+Employee.EmployeeId → Customer.SupportRepId
+Employee.ReportsTo  → Employee.EmployeeId (self-join for hierarchy)
+
+Business Notes:
+Use for support representative analysis and manager hierarchy.
+ReportsTo is self-referencing — always alias tables when joining:
+JOIN Employee mgr ON e.ReportsTo = mgr.EmployeeId
+
+---
+
+Table: Invoice
+
+Purpose:
+Stores billing transactions and order totals.
+
+Primary Key:
+InvoiceId
+
+Important Columns:
+InvoiceId      → unique invoice identifier
+CustomerId     → customer who placed order
+InvoiceDate    → billing date — use for time-series analysis
+BillingAddress → billing street address
+BillingCity    → billing city
+BillingState   → billing state
+BillingCountry → billing country — use for geographic revenue
+BillingPostalCode → billing postal code
+Total          → pre-calculated invoice total amount
+
+Relationships:
+Invoice.CustomerId → Customer.CustomerId
+Invoice.InvoiceId  → InvoiceLine.InvoiceId
+
+Business Notes:
+Invoice.Total is pre-calculated — use for fast customer-level revenue.
+For track-level revenue use InvoiceLine (UnitPrice * Quantity).
+Use InvoiceDate for time-series: strftime('%Y', InvoiceDate) for year.
+
+---
+
+Table: InvoiceLine
+
+Purpose:
+Stores individual line-item purchase details per invoice.
+
+Primary Key:
+InvoiceLineId
+
+Important Columns:
+InvoiceLineId → unique line item identifier
+InvoiceId     → parent invoice reference
+TrackId       → purchased track reference
+UnitPrice     → price per track at time of purchase
+Quantity      → quantity purchased
+
+Relationships:
+InvoiceLine.InvoiceId → Invoice.InvoiceId
+InvoiceLine.TrackId   → Track.TrackId
+
+Business Notes:
+Use for track-level and product-level revenue analysis.
+Revenue at track level = SUM(il.UnitPrice * il.Quantity)
+Never use Invoice.Total for track-level analysis — use InvoiceLine.
+
+---
+
+Table: Artist
+
+Purpose:
+Stores music artist information.
+
+Primary Key:
+ArtistId
+
+Important Columns:
+ArtistId → unique artist identifier
+Name     → artist name
+
+Relationships:
+Artist.ArtistId → Album.ArtistId
+
+Business Notes:
+Artist does not directly link to Track or InvoiceLine.
+Always traverse: Artist → Album → Track → InvoiceLine for revenue.
+
+---
+
+Table: Album
+
+Purpose:
+Stores album metadata.
+
+Primary Key:
+AlbumId
+
+Important Columns:
+AlbumId  → unique album identifier
+Title    → album title
+ArtistId → artist who created the album
+
+Relationships:
+Album.ArtistId → Artist.ArtistId
+Album.AlbumId  → Track.AlbumId
+
+Business Notes:
+Bridge between Artist and Track.
+Use for album popularity and artist discography analysis.
+
+---
+
+Table: Track
+
+Purpose:
+Stores individual song or track metadata.
+
+Primary Key:
+TrackId
+
+Important Columns:
+TrackId     → unique track identifier
+Name        → track name
+AlbumId     → album reference
+MediaTypeId → media format reference
+GenreId     → genre reference
+Composer    → composer name (nullable)
+Milliseconds → track duration in milliseconds (NOT seconds)
+Bytes       → file size
+UnitPrice   → track price
+
+Relationships:
+Track.AlbumId     → Album.AlbumId
+Track.MediaTypeId → MediaType.MediaTypeId
+Track.GenreId     → Genre.GenreId
+Track.TrackId     → InvoiceLine.TrackId
+Track.TrackId     → PlaylistTrack.TrackId
+
+Business Notes:
+Duration is stored in Milliseconds — multiply seconds by 1000.
+Example: tracks longer than 5 minutes → WHERE Milliseconds > 300000
+GenreId and MediaTypeId are FK references — always JOIN, never hardcode IDs.
+
+---
+
+Table: Genre
+
+Purpose:
+Stores music genre lookup information.
+
+Primary Key:
+GenreId
+
+Important Columns:
+GenreId → unique genre identifier
+Name    → genre name (e.g. Rock, Jazz, Classical)
+
+Relationships:
+Genre.GenreId → Track.GenreId
+
+Business Notes:
+Lookup table — always JOIN to get genre name.
+Wrong: WHERE GenreId = 1
+Right: JOIN Genre g ON t.GenreId = g.GenreId WHERE g.Name = :genre
+
+---
+
+Table: MediaType
+
+Purpose:
+Stores media format lookup information.
+
+Primary Key:
+MediaTypeId
+
+Important Columns:
+MediaTypeId → unique media type identifier
+Name        → format name (e.g. MPEG, AAC, Protected AAC)
+
+Relationships:
+MediaType.MediaTypeId → Track.MediaTypeId
+
+Business Notes:
+Lookup table — always JOIN to get format name.
+Wrong: WHERE MediaTypeId = 1
+Right: JOIN MediaType mt ON t.MediaTypeId = mt.MediaTypeId
+
+---
+
+Table: Playlist
+
+Purpose:
+Stores playlist metadata.
+
+Primary Key:
+PlaylistId
+
+Important Columns:
+PlaylistId → unique playlist identifier
+Name       → playlist name
+
+Relationships:
+Playlist.PlaylistId → PlaylistTrack.PlaylistId
+
+Business Notes:
+Playlist and Track are many-to-many.
+Always go through PlaylistTrack bridge table.
+Never JOIN Playlist directly to Track.
+
+---
+
+Table: PlaylistTrack
+
+Purpose:
+Bridge table — many-to-many mapping between Playlist and Track.
+
+Composite Primary Key:
+PlaylistId + TrackId
+
+Important Columns:
+PlaylistId → playlist reference
+TrackId    → track reference
+
+Relationships:
+PlaylistTrack.PlaylistId → Playlist.PlaylistId
+PlaylistTrack.TrackId    → Track.TrackId
+
+Business Notes:
+Always required when querying tracks in a playlist or playlists for a track.
+Example path: Playlist → PlaylistTrack → Track → InvoiceLine
+
+
+# ============================================================
+# DOCUMENT 2 — JOIN PATTERNS
+# ============================================================
+
+JOIN Patterns — Chinook Database
+
+Use these exact JOIN chains. Never guess relationships.
+
+---
+
+Customer + Revenue (customer-level):
+FROM Customer c
+JOIN Invoice i ON c.CustomerId = i.CustomerId
+
+---
+
+Customer + Revenue (track-level):
+FROM Customer c
+JOIN Invoice i ON c.CustomerId = i.CustomerId
+JOIN InvoiceLine il ON i.InvoiceId = il.InvoiceId
+
+---
+
+Track + Revenue:
+FROM Track t
+JOIN InvoiceLine il ON t.TrackId = il.TrackId
+
+---
+
+Track + Revenue + Invoice date:
+FROM Track t
+JOIN InvoiceLine il ON t.TrackId = il.TrackId
+JOIN Invoice i ON il.InvoiceId = i.InvoiceId
+
+---
+
+Artist + Revenue (full chain — always use this):
+FROM Artist ar
+JOIN Album al ON ar.ArtistId = al.ArtistId
+JOIN Track t ON al.AlbumId = t.AlbumId
+JOIN InvoiceLine il ON t.TrackId = il.TrackId
+
+---
+
+Artist + Revenue + Date:
+FROM Artist ar
+JOIN Album al ON ar.ArtistId = al.ArtistId
+JOIN Track t ON al.AlbumId = t.AlbumId
+JOIN InvoiceLine il ON t.TrackId = il.TrackId
+JOIN Invoice i ON il.InvoiceId = i.InvoiceId
+
+---
+
+Genre + Sales:
+FROM Genre g
+JOIN Track t ON g.GenreId = t.GenreId
+JOIN InvoiceLine il ON t.TrackId = il.TrackId
+
+---
+
+Genre + Sales + Country:
+FROM Genre g
+JOIN Track t ON g.GenreId = t.GenreId
+JOIN InvoiceLine il ON t.TrackId = il.TrackId
+JOIN Invoice i ON il.InvoiceId = i.InvoiceId
+
+---
+
+Playlist + Tracks:
+FROM Playlist p
+JOIN PlaylistTrack pt ON p.PlaylistId = pt.PlaylistId
+JOIN Track t ON pt.TrackId = t.TrackId
+
+---
+
+Employee + Customers (support analysis):
+FROM Employee e
+JOIN Customer c ON e.EmployeeId = c.SupportRepId
+
+---
+
+Employee + Manager (hierarchy):
+FROM Employee e
+LEFT JOIN Employee mgr ON e.ReportsTo = mgr.EmployeeId
+
+---
+
+Album + Artist + Track count:
+FROM Album al
+JOIN Artist ar ON al.ArtistId = ar.ArtistId
+JOIN Track t ON al.AlbumId = t.AlbumId
+
+
+# ============================================================
+# DOCUMENT 3 — CRITICAL GOTCHAS
+# ============================================================
+
+Chinook Database — Critical Gotchas
+
+1. Track duration is in MILLISECONDS not seconds
+   Wrong: WHERE duration > 300
+   Right: WHERE Milliseconds > 300000
+   Formula: seconds * 1000 = Milliseconds
+
+---
+
+2. Track-level revenue lives in InvoiceLine, not Invoice
+   Invoice.Total = order total (use for customer revenue)
+   InvoiceLine.UnitPrice * Quantity = track revenue (use for track/genre/artist revenue)
+   Wrong: JOIN Invoice for track revenue
+   Right: JOIN InvoiceLine il ON t.TrackId = il.TrackId
+          Revenue = SUM(il.UnitPrice * il.Quantity)
+
+---
+
+3. Genre, MediaType, Artist are lookup tables — never hardcode their IDs
+   Wrong: WHERE GenreId = 1
+   Right: JOIN Genre g ON t.GenreId = g.GenreId WHERE g.Name = :genre
+
+---
+
+4. PlaylistTrack is a mandatory bridge table
+   Wrong: JOIN Playlist directly to Track (no direct FK exists)
+   Right: JOIN PlaylistTrack pt ON p.PlaylistId = pt.PlaylistId
+          JOIN Track t ON pt.TrackId = t.TrackId
+
+---
+
+5. Employee.ReportsTo is self-referencing — always alias
+   Wrong: JOIN Employee ON Employee.EmployeeId = Employee.ReportsTo
+   Right: JOIN Employee mgr ON e.ReportsTo = mgr.EmployeeId
+
+---
+
+6. Artist does not directly link to InvoiceLine
+   Always traverse full chain: Artist → Album → Track → InvoiceLine
+
+---
+
+7. Invoice date filtering — use strftime for SQLite
+   Wrong: WHERE YEAR(InvoiceDate) = 2013
+   Right: WHERE strftime('%Y', InvoiceDate) = '2013'
+   Month: strftime('%m', InvoiceDate)
+   Quarter: use CASE with strftime('%m')
+
+
+# ============================================================
+# DOCUMENT 4 — QUERY PATTERNS
+# ============================================================
+
+Pattern: Top N customers by spending
+Triggered by: "top customers", "best customers", "highest spending", "most valuable customers"
+Tables: Customer, Invoice
+
+SELECT c.CustomerId, c.FirstName, c.LastName,
+       SUM(i.Total) AS TotalSpending
+FROM Customer c
+JOIN Invoice i ON c.CustomerId = i.CustomerId
+WHERE c.Country = :country
+GROUP BY c.CustomerId
+ORDER BY TotalSpending DESC
+LIMIT :limit
+
+---
+
+Pattern: Revenue by country
+Triggered by: "revenue by country", "sales by region", "country revenue", "geographic revenue"
+Tables: Invoice
+
+SELECT BillingCountry, SUM(Total) AS Revenue,
+       COUNT(InvoiceId) AS TotalOrders
+FROM Invoice
+GROUP BY BillingCountry
+ORDER BY Revenue DESC
+LIMIT :limit
+
+---
+
+Pattern: Popular genres by sales quantity
+Triggered by: "popular genre", "best selling genre", "genre sales", "top genres"
+Tables: Genre, Track, InvoiceLine
+
+SELECT g.Name AS Genre,
+       SUM(il.Quantity) AS TotalSold,
+       SUM(il.UnitPrice * il.Quantity) AS Revenue
+FROM Genre g
+JOIN Track t ON g.GenreId = t.GenreId
+JOIN InvoiceLine il ON t.TrackId = il.TrackId
+GROUP BY g.GenreId
+ORDER BY TotalSold DESC
+LIMIT :limit
+
+---
+
+Pattern: Artist revenue
+Triggered by: "artist revenue", "top artists", "best performing artists", "artist sales"
+Tables: Artist, Album, Track, InvoiceLine
+
+SELECT ar.Name AS Artist,
+       SUM(il.UnitPrice * il.Quantity) AS Revenue,
+       COUNT(DISTINCT il.InvoiceId) AS TotalOrders
+FROM Artist ar
+JOIN Album al ON ar.ArtistId = al.ArtistId
+JOIN Track t ON al.AlbumId = t.AlbumId
+JOIN InvoiceLine il ON t.TrackId = il.TrackId
+GROUP BY ar.ArtistId
+ORDER BY Revenue DESC
+LIMIT :limit
+
+---
+
+Pattern: Monthly or yearly revenue trend
+Triggered by: "revenue trend", "sales over time", "monthly sales", "yearly revenue"
+Tables: Invoice
+
+SELECT strftime('%Y', InvoiceDate) AS Year,
+       strftime('%m', InvoiceDate) AS Month,
+       SUM(Total) AS Revenue,
+       COUNT(InvoiceId) AS TotalOrders
+FROM Invoice
+GROUP BY Year, Month
+ORDER BY Year ASC, Month ASC
+
+---
+
+Pattern: Employee support performance
+Triggered by: "support rep performance", "employee sales", "best support rep"
+Tables: Employee, Customer, Invoice
+
+SELECT e.FirstName || ' ' || e.LastName AS SupportRep,
+       COUNT(DISTINCT c.CustomerId) AS TotalCustomers,
+       SUM(i.Total) AS TotalRevenue
+FROM Employee e
+JOIN Customer c ON e.EmployeeId = c.SupportRepId
+JOIN Invoice i ON c.CustomerId = i.CustomerId
+GROUP BY e.EmployeeId
+ORDER BY TotalRevenue DESC
+
+---
+
+Pattern: Track popularity by sales
+Triggered by: "popular tracks", "best selling songs", "top tracks"
+Tables: Track, InvoiceLine, Artist, Album
+
+SELECT t.Name AS Track,
+       ar.Name AS Artist,
+       SUM(il.Quantity) AS TotalSold
+FROM Track t
+JOIN InvoiceLine il ON t.TrackId = il.TrackId
+JOIN Album al ON t.AlbumId = al.AlbumId
+JOIN Artist ar ON al.ArtistId = ar.ArtistId
+GROUP BY t.TrackId
+ORDER BY TotalSold DESC
+LIMIT :limit
+
+---
+
+Pattern: Playlist track count
+Triggered by: "playlist size", "tracks in playlist", "playlist composition"
+Tables: Playlist, PlaylistTrack, Track
+
+SELECT p.Name AS Playlist,
+       COUNT(pt.TrackId) AS TotalTracks
+FROM Playlist p
+JOIN PlaylistTrack pt ON p.PlaylistId = pt.PlaylistId
+GROUP BY p.PlaylistId
+ORDER BY TotalTracks DESC
+
+
+# ============================================================
+# DOCUMENT 5 — BUSINESS METRICS
+# ============================================================
+
+Business Metrics — Chinook Database
+
+Revenue (customer level):
+SUM(Invoice.Total)
+Tables: Invoice
+
+---
+
+Revenue (track level):
+SUM(InvoiceLine.UnitPrice * InvoiceLine.Quantity)
+Tables: InvoiceLine
+
+---
+
+Average Order Value:
+AVG(Invoice.Total)
+Tables: Invoice
+
+---
+
+Top Customers:
+SUM(Invoice.Total) ORDER BY DESC
+Tables: Customer, Invoice
+
+---
+
+Country Revenue:
+SUM(Invoice.Total) GROUP BY BillingCountry
+Tables: Invoice
+
+---
+
+Track Revenue:
+SUM(InvoiceLine.UnitPrice * InvoiceLine.Quantity)
+Tables: Track, InvoiceLine
+
+---
+
+Artist Revenue:
+SUM(InvoiceLine.UnitPrice * InvoiceLine.Quantity)
+Tables: Artist, Album, Track, InvoiceLine
+Chain: Artist → Album → Track → InvoiceLine
+
+---
+
+Popular Genre:
+SUM(InvoiceLine.Quantity) GROUP BY Genre.Name
+Tables: Genre, Track, InvoiceLine
+
+---
+
+Customer Count by Country:
+COUNT(CustomerId) GROUP BY Country
+Tables: Customer
+
+---
+
+Average Tracks per Album:
+COUNT(Track.TrackId) / COUNT(DISTINCT Album.AlbumId)
+Tables: Track, Album
+
+---
+
+# ============================================================
+# DOCUMENT 6 — COMPLETE QUERY TEMPLATES
+# ============================================================
+
+Complete Query: Artist Revenue
+Triggered by: artist revenue, top artists, best artists, artist sales
+Tables: Artist, Album, Track, InvoiceLine
+Note: Use InvoiceLine UnitPrice*Quantity for revenue — NOT Invoice.Total
+
+SELECT ar.Name AS Artist,
+       SUM(il.UnitPrice * il.Quantity) AS Revenue
+FROM Artist ar
+JOIN Album al ON ar.ArtistId = al.ArtistId
+JOIN Track t ON al.AlbumId = t.AlbumId
+JOIN InvoiceLine il ON t.TrackId = il.TrackId
+GROUP BY ar.ArtistId, ar.Name
+ORDER BY Revenue DESC
+LIMIT :limit;
+
+---
+
+Complete Query: Genre Sales
+Triggered by: genre sales, popular genre, best genre, genre revenue
+Tables: Genre, Track, InvoiceLine
+
+SELECT g.Name AS Genre,
+       SUM(il.UnitPrice * il.Quantity) AS TotalSales
+FROM Genre g
+JOIN Track t ON g.GenreId = t.GenreId
+JOIN InvoiceLine il ON t.TrackId = il.TrackId
+GROUP BY g.GenreId, g.Name
+ORDER BY TotalSales DESC
+LIMIT :limit;
+
+---
+
+Complete Query: Revenue by Country
+Triggered by: revenue by country, country revenue, sales by region
+Tables: Invoice
+
+SELECT BillingCountry AS Country,
+       SUM(Total) AS Revenue,
+       COUNT(InvoiceId) AS TotalOrders
+FROM Invoice
+GROUP BY BillingCountry
+ORDER BY Revenue DESC
+LIMIT :limit;
+
+---
+
+Complete Query: Employee Customer Count
+Triggered by: employee customers, support rep, employee performance
+Tables: Employee, Customer
+
+SELECT e.FirstName || ' ' || e.LastName AS Employee,
+       e.Title,
+       COUNT(c.CustomerId) AS TotalCustomers
+FROM Employee e
+JOIN Customer c ON e.EmployeeId = c.SupportRepId
+GROUP BY e.EmployeeId
+ORDER BY TotalCustomers DESC
+LIMIT :limit;
+
+---
+
+Complete Query: Track Duration Filter
+Triggered by: tracks longer than, duration, minutes, milliseconds
+Tables: Track
+Note: Duration in Milliseconds — 5 minutes = 300000 milliseconds
+
+SELECT COUNT(*) AS TrackCount
+FROM Track
+WHERE Milliseconds > 300000;
+
+---
+
+Complete Query: Albums by Artist
+Triggered by: albums by artist, artist albums, show albums
+Tables: Artist, Album
+Note: Use literal artist name in WHERE clause
+
+SELECT al.Title AS Album,
+       ar.Name AS Artist
+FROM Album al
+JOIN Artist ar ON al.ArtistId = ar.ArtistId
+WHERE ar.Name = :artist
+ORDER BY al.Title
+LIMIT :limit;
