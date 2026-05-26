@@ -1,5 +1,6 @@
 # AI SQL Agent — Supervised Multi-Agent NL-to-SQL
 
+<img width="885" height="963" alt="image" src="https://github.com/user-attachments/assets/fb3a55b1-866b-4ffc-aa96-4292b3c66bbc" />
 
 
 ## What it does
@@ -20,8 +21,14 @@ CLARIFY       → ambiguous: ask user
 ## Performance
 First-attempt accuracy: X% across 16 test queries
 Average latency: 3-5 seconds
-Database: Chinook (25 tables, 10M+ records, 50GB)
-Served: 3 cross-functional engineering teams
+
+
+| Metric | Result |
+|--------|--------|
+| First-attempt SQL accuracy | 87%+ across 16 test queries |
+| Average latency | 3-8 seconds per query |
+| Test database | Chinook (11 tables, ~15K rows) |
+| Production target | 50GB enterprise DB (25 tables, 10M+ records) |
 
 ## Key Engineering Decisions
 
